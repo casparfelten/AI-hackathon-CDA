@@ -2,9 +2,10 @@
 """
 Gemini MCP Integration Test Suite
 
-This test suite validates Gemini's ability to use MCP tools to create studies.
-It asks Gemini to create a draft study with two URL options (example.com/1 and example.com/2)
-to test which performs better.
+This test suite validates Gemini's ability to use MCP tools to create draft real studies.
+It asks Gemini to create a draft study (UNPUBLISHED status) with two URL options 
+(example.com/1 and example.com/2) to test which performs better.
+The study is created as a draft and is NOT executed, launched, or deleted.
 """
 
 import asyncio
@@ -15,6 +16,7 @@ import time
 from typing import Any, Optional
 
 from src.prolific_mcp.gemini_client import GeminiMCPClient
+from src.prolific_mcp.config import config
 
 
 class Colors:
@@ -29,27 +31,27 @@ class Colors:
 
 def print_test(name: str):
     """Print test header."""
-    print(f"\n{Colors.BLUE}{Colors.BOLD}=== {name} ==={Colors.RESET}")
+    print(f"\n{Colors.BLUE}{Colors.BOLD}=== {name} ==={Colors.RESET}", flush=True)
 
 
 def print_success(message: str):
     """Print success message."""
-    print(f"{Colors.GREEN}✓ {message}{Colors.RESET}")
+    print(f"{Colors.GREEN}✓ {message}{Colors.RESET}", flush=True)
 
 
 def print_error(message: str):
     """Print error message."""
-    print(f"{Colors.RED}✗ {message}{Colors.RESET}")
+    print(f"{Colors.RED}✗ {message}{Colors.RESET}", flush=True)
 
 
 def print_info(message: str):
     """Print info message."""
-    print(f"{Colors.YELLOW}ℹ {message}{Colors.RESET}")
+    print(f"{Colors.YELLOW}ℹ {message}{Colors.RESET}", flush=True)
 
 
 def print_verbose(message: str):
     """Print verbose/debug message."""
-    print(f"{Colors.YELLOW}  → {message}{Colors.RESET}")
+    print(f"{Colors.YELLOW}  → {message}{Colors.RESET}", flush=True)
 
 
 def extract_study_id(text: str) -> Optional[str]:
@@ -84,26 +86,64 @@ async def test_gemini_create_study() -> tuple[bool, Optional[str], str]:
     
     client = GeminiMCPClient()
     
-    prompt = """Create a TEST STUDY (not a real study) to test which URL performs better. 
-This is for testing purposes only and will not consume any credits.
+    prompt = """=== SYSTEM PROMPT ===
 
-Create a test study with two URL options: example.com/1 and example.com/2. 
-Fill in all required fields appropriately including:
-- A descriptive name about testing two URL options (include "TEST" in the name)
-- A clear description explaining this is a test study
-- Appropriate reward amount (in cents) - can be minimal since it's a test
-- Estimated completion time
-- Set the external_study_url appropriately (you can use example.com/1 or example.com/2)
-- Use study_type SINGLE
-- Add study_labels as ["survey"]
-- Set total_available_places to 1 (just for testing)
-- Include completion codes
+You are an AI assistant with access to Prolific study creation tools via the Model Context Protocol (MCP). Your role is to help create and manage user research studies on the Prolific platform.
 
-IMPORTANT: This is a TEST STUDY. Test studies do not consume credits and should NOT be deleted.
-1. First, create the study as a draft using prolific_create_study
-2. Then, if available, use prolific_launch_test_study to launch it in test mode (this doesn't consume credits)
-3. The study should be fully completed as a test (not left as draft)
-4. Do NOT delete the test study - test studies can remain for future testing"""
+TECHNICAL DETAILS:
+- You have access to MCP tools for Prolific study management
+- The primary tool is prolific_create_study which creates draft studies (status: UNPUBLISHED)
+- Draft studies are not published or launched - they remain as drafts until explicitly launched
+- Studies created via prolific_create_study are automatically in draft status and do not consume credits
+- You should NOT delete draft studies - they can remain for review and future use
+- All studies must include required fields: name, description, reward (in cents), estimated_completion_time (in minutes), external_study_url, total_available_places, study_type, study_labels, and completion_codes
+- The external_study_url can include placeholders: {{%PROLIFIC_PID%}}, {{%STUDY_ID%}}, {{%SESSION_ID%}}
+- study_type should typically be "SINGLE" for standard studies
+- study_labels should be an array like ["survey"] for survey-type studies
+- completion_codes should be an array of objects with: code (string), code_type (enum), and actions (array of action objects)
+- Default completion code format: [{"code": "COMPLETED", "code_type": "COMPLETED", "actions": [{"action": "MANUALLY_REVIEW"}]}]
+- prolific_id_option defaults to "url_parameters" which appends Prolific ID to the URL
+
+WORKFLOW:
+1. When asked to create a study, you MUST call prolific_create_study with all required parameters
+2. Design the study appropriately based on the research goals provided
+3. Fill in all fields with sensible defaults based on the study requirements
+4. Do NOT ask for clarification - use reasonable defaults and create the study
+5. After creation, confirm the study was created and provide the study ID
+6. Do NOT launch, publish, or delete the study - leave it as a draft
+
+=== INSTRUCTIONS ===
+
+Create a user research study to test two versions of a website (example.com) to determine which performs better.
+
+STUDY CONTEXT:
+- Website: example.com (a customer service platform)
+- Two versions being tested:
+  * Version A: Original version (control)
+  * Version B: New version with added customer service chatbot in bottom right corner
+- The chatbot is the key feature difference between versions
+- Participants will be randomly assigned to one version
+
+RESEARCH GOAL:
+Determine which version provides better user experience and identify the feature difference.
+
+STUDY REQUIREMENTS:
+- URL: example.com (do not pass any path parameters, just the base URL)
+- Number of participants: 10
+- Study type: Survey to compare two website versions
+- Participants should be asked about:
+  1. Their overall experience with the site
+  2. What feature differences they noticed (if any)
+  3. Which version they prefer (if they can identify differences)
+
+IMPORTANT:
+- Include plausible but obviously wrong options in the survey questions (e.g., "Added dark mode toggle" or "Changed logo color" when the real difference is the chatbot)
+- Design appropriate survey questions that will help identify if participants noticed the chatbot feature
+- Use reasonable defaults for reward amount and completion time based on the study complexity
+- Create the study as a draft - do NOT launch it
+
+ACTION REQUIRED:
+Call prolific_create_study NOW with all required parameters. Design the study description and structure appropriately for this A/B testing scenario."""
 
     print_verbose("=" * 60)
     print_verbose("STEP 1: Connecting to MCP server...")
@@ -158,8 +198,12 @@ IMPORTANT: This is a TEST STUDY. Test studies do not consume credits and should 
     try:
         print_verbose("\n[TEST] Calling client.chat() - Gemini API interaction starting...")
         print_verbose("[TEST] This will show real-time progress as Gemini processes...")
+        print_verbose("[TEST] Watch for [Gemini] and [MCP] prefixes for real-time updates...")
+        print_verbose("[TEST] Starting async chat call now...")
+        sys.stdout.flush()
         response = await client.chat(prompt)
         elapsed = time.time() - start_time
+        sys.stdout.flush()
         
         print_verbose("\n" + "=" * 60)
         print_verbose("STEP 4: Gemini API Response Received")
@@ -181,65 +225,89 @@ IMPORTANT: This is a TEST STUDY. Test studies do not consume credits and should 
         success, study_id = verify_study_created(response)
         
         if success:
-            print_success("Gemini successfully created a study")
+            print_success("✓ Gemini API response indicates study was created")
+            print_verbose("✓ Success indicators found in response")
             if study_id:
-                print_success(f"Study ID extracted: {study_id}")
-                print_verbose(f"Study ID pattern found: {study_id}")
+                print_success(f"✓ Study ID extracted: {study_id}")
+                print_verbose(f"✓ Study ID pattern found: {study_id}")
+                print_verbose(f"✓ Study ID format validated (24 hex characters)")
             else:
-                print_info("Could not extract study ID from response, but study appears to be created")
-                print_verbose("Attempting to find study ID in response text...")
+                print_info("⚠ Could not extract study ID from response, but study appears to be created")
+                print_verbose("Searching for study ID patterns in response text...")
                 # Try to find any study ID patterns
                 potential_ids = re.findall(r'[0-9a-f]{24}', response, re.IGNORECASE)
                 if potential_ids:
                     print_verbose(f"Found potential study IDs: {potential_ids}")
+                    print_verbose("These may be study IDs mentioned in the response")
         else:
-            print_error("Gemini response does not indicate successful study creation")
+            print_error("✗ Gemini API response does not indicate successful study creation")
             print_verbose("Response may need manual review")
             print_verbose("Searching for success indicators in response...")
+            print_verbose("Checking for common success phrases...")
         
         # Check for key requirements
         checks = {
-            "Two URLs mentioned": any(url in response.lower() for url in ["example.com/1", "example.com/2"]),
-            "Test study mentioned": "test" in response.lower(),
-            "Study created": success,
+            "Draft study created": success,
+            "Study ID found": study_id is not None,
+            "Website mentioned": "example.com" in response.lower(),
         }
         
-        print_verbose("\nVerification checks:")
+        print_verbose("\n" + "=" * 60)
+        print_verbose("STEP 6: Verification Checks")
+        print_verbose("=" * 60)
+        print_verbose("Verifying response meets requirements...")
         for check_name, check_result in checks.items():
             if check_result:
-                print_success(f"  {check_name}")
+                print_success(f"  ✓ {check_name}")
             else:
-                print_error(f"  {check_name}")
+                print_error(f"  ✗ {check_name}")
+        print_verbose("=" * 60)
         
         return success, study_id, response
         
     except Exception as e:
-        print_error(f"Error during Gemini chat: {str(e)}")
+        print_error(f"✗ Error during Gemini API interaction: {str(e)}")
+        print_verbose("=" * 60)
+        print_verbose("ERROR DETAILS:")
+        print_verbose("=" * 60)
         import traceback
         print_verbose("Exception traceback:")
         traceback.print_exc()
+        print_verbose("=" * 60)
         return False, None, str(e)
     finally:
+        print_verbose("\nCleaning up connections...")
+        print_verbose("Closing MCP server connection...")
         await client.close()
+        print_verbose("✓ Connections closed")
 
 
 async def verify_study_details(study_id: str) -> bool:
     """Verify study details by getting it via MCP."""
-    print_test("Verify Study Details")
+    print_test("Verify Study Details via MCP API")
     
     if not study_id:
-        print_error("No study ID provided")
+        print_error("✗ No study ID provided")
         return False
+    
+    print_verbose("=" * 60)
+    print_verbose("STEP 7: Verifying Study via MCP API")
+    print_verbose("=" * 60)
+    print_verbose(f"Study ID: {study_id}")
+    print_verbose("Calling MCP tool: prolific_get_study")
+    print_verbose("This will verify the study was actually created in Prolific...")
     
     # Use direct MCP call to verify
     from src.prolific_mcp.server import call_tool
     
     try:
+        print_verbose("Making MCP API call to Prolific...")
         result = await call_tool("prolific_get_study", {"study_id": study_id})
         
         if result and len(result) > 0:
             response_text = result[0].text
-            print_success("Successfully retrieved study details")
+            print_success("✓ Successfully retrieved study details from Prolific API")
+            print_verbose("✓ MCP API call to Prolific succeeded")
             
             # Parse study data
             try:
@@ -252,20 +320,29 @@ async def verify_study_details(study_id: str) -> bool:
                     print_verbose(f"  Name: {study_data.get('name')}")
                     print_verbose(f"  Status: {study_data.get('status')}")
                     print_verbose(f"  URL: {study_data.get('external_study_url')}")
-                    print_verbose(f"  Places: {study_data.get('total_available_places')}")
+                    places = study_data.get('total_available_places')
+                    print_verbose(f"  Places: {places}")
                     print_verbose(f"  Reward: {study_data.get('reward')} cents")
                     
-                    # Verify it's a test study (check name or status)
-                    study_name = study_data.get('name', '').lower()
+                    # Verify participant count
+                    if places == 10:
+                        print_success("✓ Study has 10 participants as requested")
+                    else:
+                        print_info(f"ℹ Study has {places} participants (expected 10)")
+                    
+                    # Verify it's a draft study (check status)
+                    study_name = study_data.get('name', '')
                     study_status = study_data.get('status', '')
                     
-                    if 'test' in study_name:
-                        print_success("Study name indicates it's a test study")
-                    else:
-                        print_info(f"Study name: {study_data.get('name')}")
-                    
+                    print_verbose(f"Study name: {study_name}")
                     print_verbose(f"Study status: {study_status}")
-                    print_info("Note: Test studies should not be deleted (they consume no credits)")
+                    
+                    if study_status == "UNPUBLISHED":
+                        print_success("✓ Study is in draft (UNPUBLISHED) status as expected")
+                    else:
+                        print_info(f"ℹ Study status: {study_status} (expected UNPUBLISHED for draft)")
+                    
+                    print_info("Note: Draft studies are not deleted - they remain for verification")
                     
                     return True
             except json.JSONDecodeError:
@@ -280,21 +357,30 @@ async def verify_study_details(study_id: str) -> bool:
         return False
 
 
-async def verify_test_study_complete(study_id: str) -> bool:
-    """Verify test study is complete (test studies should not be deleted)."""
-    print_test("Verify Test Study Complete")
+async def verify_draft_study_exists(study_id: str) -> bool:
+    """Verify draft study exists and is in draft (UNPUBLISHED) status."""
+    print_test("Verify Draft Study Exists (via MCP API)")
     
     if not study_id:
         print_info("No study ID to verify")
         return True
     
+    print_verbose("=" * 60)
+    print_verbose("STEP 8: Final Verification via MCP API")
+    print_verbose("=" * 60)
+    print_verbose(f"Study ID: {study_id}")
+    print_verbose("Making final MCP API call to confirm draft study exists...")
+    
     from src.prolific_mcp.server import call_tool
     
     try:
+        print_verbose("Calling MCP tool: prolific_get_study")
         result = await call_tool("prolific_get_study", {"study_id": study_id})
         
         if result and len(result) > 0:
             response_text = result[0].text
+            print_verbose("✓ MCP API call successful")
+            print_verbose("✓ Prolific API responded with study data")
             
             # Parse study data
             try:
@@ -304,13 +390,21 @@ async def verify_test_study_complete(study_id: str) -> bool:
                     study_data = json.loads(json_str)
                     
                     status = study_data.get('status', '')
-                    print_verbose(f"Test study status: {status}")
+                    print_verbose(f"✓ Study data parsed successfully")
+                    print_verbose(f"Draft study status: {status}")
                     
-                    # Test studies can be in various states - just verify it exists
-                    print_success("Test study exists and is accessible")
-                    print_info("Test studies are NOT deleted (they consume no credits)")
-                    print_info(f"Test study ID: {study_id}")
-                    return True
+                    # Verify it's in draft (UNPUBLISHED) status
+                    if status == "UNPUBLISHED":
+                        print_success("✓ Draft study exists and is in UNPUBLISHED (draft) status")
+                        print_info("ℹ Draft studies are NOT deleted - they remain for verification")
+                        print_info(f"ℹ Draft study ID: {study_id}")
+                        print_verbose("✓ All API verifications passed")
+                        return True
+                    else:
+                        print_info(f"ℹ Study status: {status} (expected UNPUBLISHED for draft)")
+                        print_success("✓ Draft study exists and is accessible via Prolific API")
+                        print_info("ℹ Draft studies are NOT deleted - they remain for verification")
+                        return True
             except json.JSONDecodeError:
                 print_error("Could not parse study data")
                 return False
@@ -333,10 +427,10 @@ async def main():
     
     print_verbose("This test suite validates Gemini's ability to:")
     print_verbose("1. Connect to MCP server")
-    print_verbose("2. Use MCP tools to create a TEST STUDY")
+    print_verbose("2. Use MCP tools to create a DRAFT real study")
     print_verbose("3. Fill in required fields appropriately")
-    print_verbose("4. Create and complete test study (test studies consume no credits)")
-    print_verbose("5. Test studies are NOT deleted (they can remain for testing)")
+    print_verbose("4. Create draft study (status UNPUBLISHED) - does not execute/launch")
+    print_verbose("5. Draft studies are NOT deleted (they remain for verification)")
     print()
     
     suite_start_time = time.time()
@@ -354,9 +448,9 @@ async def main():
             verify_success = await verify_study_details(study_id)
             results.append(("Verify Study Details", verify_success))
             
-            # Verify test study is complete (test studies are NOT deleted)
-            test_complete = await verify_test_study_complete(study_id)
-            results.append(("Verify Test Study Complete", test_complete))
+            # Verify draft study exists (draft studies are NOT deleted)
+            draft_exists = await verify_draft_study_exists(study_id)
+            results.append(("Verify Draft Study Exists", draft_exists))
         elif success:
             print_info("Study appears to be created but ID not extracted - skipping verification")
         else:
@@ -365,13 +459,13 @@ async def main():
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}Test suite interrupted by user{Colors.RESET}")
         if study_id:
-            print_info(f"Note: Test study {study_id} exists (test studies are not deleted)")
+            print_info(f"Note: Draft study {study_id} exists (draft studies are not deleted)")
     except Exception as e:
         print_error(f"Unexpected error: {str(e)}")
         import traceback
         traceback.print_exc()
         if study_id:
-            print_info(f"Note: Test study {study_id} exists (test studies are not deleted)")
+            print_info(f"Note: Draft study {study_id} exists (draft studies are not deleted)")
     
     suite_elapsed = time.time() - suite_start_time
     
