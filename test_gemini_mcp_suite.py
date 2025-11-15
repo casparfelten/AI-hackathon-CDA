@@ -105,47 +105,79 @@ IMPORTANT: This is a TEST STUDY. Test studies do not consume credits and should 
 3. The study should be fully completed as a test (not left as draft)
 4. Do NOT delete the test study - test studies can remain for future testing"""
 
-    print_verbose("Connecting to MCP server...")
+    print_verbose("=" * 60)
+    print_verbose("STEP 1: Connecting to MCP server...")
+    print_verbose("=" * 60)
+    print_verbose("Initializing Gemini MCP client...")
+    print_verbose("Checking Gemini API key configuration...")
+    try:
+        config.validate_gemini()
+        print_success("✓ Gemini API key is configured")
+    except Exception as e:
+        print_error(f"✗ Gemini API key validation failed: {str(e)}")
+        return False, None, str(e)
+    
     print_verbose("Starting MCP server subprocess...")
+    print_verbose("MCP server will run as: python -m src.prolific_mcp.server")
     try:
         await client.connect()
-        print_success("Connected to MCP server")
-        print_verbose(f"Found {len(client.mcp_tools)} MCP tools")
-        print_verbose("Available MCP tools:")
+        print_success("✓ Connected to MCP server successfully")
+        print_verbose(f"✓ MCP server subprocess started and initialized")
+        print_verbose(f"✓ Found {len(client.mcp_tools)} MCP tools available")
+        print_verbose("\nAvailable MCP tools:")
         for tool in client.mcp_tools[:5]:  # Show first 5 tools
             print_verbose(f"  - {tool.get('name', 'unknown')}")
         if len(client.mcp_tools) > 5:
             print_verbose(f"  ... and {len(client.mcp_tools) - 5} more tools")
+        print_verbose("✓ MCP tools loaded and ready for Gemini")
     except Exception as e:
-        print_error(f"Failed to connect to MCP server: {str(e)}")
+        print_error(f"✗ Failed to connect to MCP server: {str(e)}")
         import traceback
         print_verbose("Connection error traceback:")
         traceback.print_exc()
         return False, None, str(e)
     
-    print_verbose("\nSending prompt to Gemini...")
+    print_verbose("\n" + "=" * 60)
+    print_verbose("STEP 2: Connecting to Gemini API...")
     print_verbose("=" * 60)
-    print_verbose("PROMPT:")
+    print_verbose("Initializing Gemini client...")
+    print_verbose(f"Gemini client initialized: {client.gemini_client is not None}")
+    print_verbose("✓ Gemini API client ready")
+    
+    print_verbose("\n" + "=" * 60)
+    print_verbose("STEP 3: Sending prompt to Gemini...")
+    print_verbose("=" * 60)
+    print_verbose("PROMPT TO GEMINI:")
     print(prompt)
     print_verbose("=" * 60)
     print_verbose("Waiting for Gemini response (this may take a while)...")
-    print_verbose("Gemini will use MCP tools to create the study...")
+    print_verbose("Gemini will analyze the prompt and use MCP tools to create the study...")
+    print_verbose("Monitoring Gemini API calls and MCP tool invocations...")
     
     start_time = time.time()
     try:
-        print_verbose("\n[Gemini is processing...]")
+        print_verbose("\n[TEST] Calling client.chat() - Gemini API interaction starting...")
+        print_verbose("[TEST] This will show real-time progress as Gemini processes...")
         response = await client.chat(prompt)
         elapsed = time.time() - start_time
         
-        print_verbose(f"\nGemini response received in {elapsed:.2f} seconds")
+        print_verbose("\n" + "=" * 60)
+        print_verbose("STEP 4: Gemini API Response Received")
         print_verbose("=" * 60)
-        print_verbose("FULL GEMINI RESPONSE:")
+        print_success(f"✓ Gemini API call completed in {elapsed:.2f} seconds")
+        print_verbose(f"✓ Response received from Gemini API")
+        print_verbose(f"✓ Response length: {len(response)} characters")
+        print_verbose("\n" + "=" * 60)
+        print_verbose("FULL GEMINI API RESPONSE:")
         print_verbose("=" * 60)
         print(response)
         print_verbose("=" * 60)
         
         # Verify study was created
-        print_verbose("\nAnalyzing Gemini response...")
+        print_verbose("\n" + "=" * 60)
+        print_verbose("STEP 5: Analyzing Gemini Response")
+        print_verbose("=" * 60)
+        print_verbose("Parsing response to verify study creation...")
         success, study_id = verify_study_created(response)
         
         if success:

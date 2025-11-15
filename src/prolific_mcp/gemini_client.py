@@ -3,6 +3,7 @@
 import asyncio
 import json
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
@@ -121,12 +122,18 @@ class GeminiMCPClient:
             # Generate content with Gemini - run blocking call in executor to avoid blocking event loop
             try:
                 if iteration == 1:
-                    print(f"[Gemini] Sending initial prompt to model {model}...")
+                    print(f"[Gemini] Iteration {iteration}: Sending initial request to model {model}...")
+                    if isinstance(current_prompt, str):
+                        print(f"[Gemini]   Prompt length: {len(current_prompt)} characters")
+                    print(f"[Gemini]   Available tools: {len(self.mcp_tools) if self.mcp_tools else 0}")
+                    print(f"[Gemini]   Request sent, waiting for response...")
                 else:
-                    print(f"[Gemini] Iteration {iteration}: Continuing conversation with function results...")
+                    print(f"[Gemini] Iteration {iteration}: Sending follow-up request with function results...")
+                    print(f"[Gemini]   Request sent, waiting for response...")
                 
                 # Run the blocking generate_content call in a thread pool executor
                 loop = asyncio.get_event_loop()
+                request_start = time.time()
                 response = await asyncio.wait_for(
                     loop.run_in_executor(
                         self._executor,
@@ -137,7 +144,8 @@ class GeminiMCPClient:
                     ),
                     timeout=120.0  # 2 minute timeout per API call
                 )
-                print(f"[Gemini] Response received from model")
+                request_elapsed = time.time() - request_start
+                print(f"[Gemini] ✓ Response received from model (took {request_elapsed:.2f} seconds)")
             except asyncio.TimeoutError:
                 print(f"[Gemini] API call timed out after 120 seconds")
                 return "Error: Gemini API call timed out"
@@ -157,11 +165,11 @@ class GeminiMCPClient:
                 
                 if function_calls:
                     # Execute function calls via MCP
-                    print(f"[Gemini] Gemini wants to call {len(function_calls)} function(s)")
+                    print(f"[Gemini] → Response contains {len(function_calls)} function call(s)")
                     function_responses = []
                     for idx, func_call in enumerate(function_calls, 1):
                         tool_name = func_call.name
-                        print(f"[Gemini] Function call {idx}/{len(function_calls)}: {tool_name}")
+                        print(f"[Gemini]   Function call {idx}/{len(function_calls)}: {tool_name}")
                         
                         # Parse arguments - Gemini may provide as dict or JSON string
                         if hasattr(func_call, 'args'):
@@ -175,19 +183,22 @@ class GeminiMCPClient:
                         else:
                             arguments = {}
                         
-                        print(f"[MCP] Calling tool: {tool_name}")
-                        print(f"[MCP] Arguments: {json.dumps(arguments, indent=2) if arguments else '{}'}")
+                        print(f"[MCP]   → Executing tool: {tool_name}")
+                        if arguments:
+                            print(f"[MCP]     Arguments: {json.dumps(arguments, indent=2)[:200]}...")
                         
                         # Call MCP tool
                         try:
+                            mcp_start = time.time()
                             result = await self.mcp_session.call_tool(tool_name, arguments)
+                            mcp_elapsed = time.time() - mcp_start
                             
                             # Format result for Gemini
                             result_text = "\n".join([content.text for content in result.content])
-                            print(f"[MCP] Tool {tool_name} executed successfully")
-                            print(f"[MCP] Result length: {len(result_text)} characters")
+                            print(f"[MCP]   ✓ Tool {tool_name} executed successfully (took {mcp_elapsed:.2f} seconds)")
+                            print(f"[MCP]     Result length: {len(result_text)} characters")
                             if len(result_text) < 500:
-                                print(f"[MCP] Result preview: {result_text[:200]}...")
+                                print(f"[MCP]     Result preview: {result_text[:200]}...")
                             
                             function_responses.append(
                                 genai.types.FunctionResponse(
@@ -196,7 +207,7 @@ class GeminiMCPClient:
                                 )
                             )
                         except Exception as e:
-                            print(f"[MCP] Error calling {tool_name}: {str(e)}")
+                            print(f"[MCP]   ✗ Error calling {tool_name}: {str(e)}")
                             function_responses.append(
                                 genai.types.FunctionResponse(
                                     name=tool_name,
@@ -204,7 +215,7 @@ class GeminiMCPClient:
                                 )
                             )
                     
-                    print(f"[Gemini] Sending function results back to Gemini...")
+                    print(f"[Gemini] → Sending function results back to Gemini for next iteration...")
                     
                     # Continue conversation with function results
                     conversation_history.append({
@@ -224,8 +235,8 @@ class GeminiMCPClient:
                     response_text = "".join([
                         part.text for part in parts if hasattr(part, 'text') and part.text
                     ])
-                    print(f"[Gemini] No more function calls needed. Final response ready.")
-                    print(f"[Gemini] Response length: {len(response_text)} characters")
+                    print(f"[Gemini] → No function calls in response - final answer ready")
+                    print(f"[Gemini]   Response length: {len(response_text)} characters")
                     return response_text
             else:
                 # No content in response
