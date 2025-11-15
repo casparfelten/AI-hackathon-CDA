@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prolific-mcp"
+version = "0.1.0"
+description = "MCP server for automated Prolific user studies"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp>=0.9.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.setuptools]
+packages = ["prolific_mcp"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
