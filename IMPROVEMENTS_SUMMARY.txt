@@ -1,0 +1,84 @@
+IMPROVEMENTS MADE TO AUTONOMOUS AGENT PROMPT
+============================================
+
+KEY IMPROVEMENTS:
+
+1. ADDED CONTEXT ABOUT BEING PART OF LARGER PROMPT
+   ✓ Added header note: "This section is part of a larger system prompt"
+   ✓ Clarified MCP tool access context
+   ✓ Added "END OF SECTION" marker
+
+2. ENHANCED MCP PROLIFIC SECTION WITH DETAILED FIELD FORMATTING
+   ✓ Added complete parameter documentation for prolific_create_study
+   ✓ Included format, examples, and "what to put" for each field
+   ✓ Added URL placeholder explanation ({{%PROLIFIC_PID%}}, etc.)
+   ✓ Documented optional parameters with recommended defaults
+   ✓ Added completion_codes structure explanation
+   ✓ Included response format documentation
+
+3. IMPROVED PROLIFIC STUDY CREATION INSTRUCTIONS
+   ✓ Changed from vague "Title/Question/Answers" to proper MCP tool usage
+   ✓ Specified exact field names and data types
+   ✓ Added reward calculation guidance (cents, not dollars)
+   ✓ Clarified URL format with placeholders
+   ✓ Added workflow steps for study creation
+   ✓ Documented study status (UNPUBLISHED/draft)
+
+4. ADDED TECHNICAL ACCURACY
+   ✓ Corrected reward format (integer in cents, not dollars)
+   ✓ Added proper URL placeholder syntax
+   ✓ Included prolific_id_option explanation
+   ✓ Added completion_codes default structure
+   ✓ Documented response parsing (extracting study_id)
+
+5. ENHANCED ERROR HANDLING
+   ✓ Added error handling section
+   ✓ Specified common Prolific API errors
+   ✓ Added validation checks (reward minimum, URL format, etc.)
+
+6. IMPROVED FINAL OUTPUT SECTION
+   ✓ Added Prolific Study ID to output
+   ✓ Added Prolific Study Link format
+   ✓ Clarified what information to extract and return
+
+7. ADDED EXECUTION RULES SECTION
+   ✓ Clarified autonomous execution requirements
+   ✓ Listed what NOT to ask user
+   ✓ Added error handling guidelines
+   ✓ Specified retry behavior
+
+8. BETTER INTEGRATION WITH MCP TOOLS
+   ✓ Referenced MCP GitHub tools explicitly
+   ✓ Referenced MCP Vercel tools explicitly
+   ✓ Referenced MCP Prolific tools explicitly
+   ✓ Added fallback instructions for CLI usage
+
+COMPARISON:
+
+ORIGINAL VERSION:
+- Vague Prolific instructions ("Title: Which website design is better?")
+- No field formatting details
+- No MCP tool context
+- No URL placeholder explanation
+- No error handling guidance
+- Missing technical details (cents vs dollars, etc.)
+
+IMPROVED VERSION:
+- Detailed MCP tool usage with proper field names
+- Complete field formatting guide
+- Context about being part of larger prompt
+- URL placeholder documentation
+- Error handling section
+- Technical accuracy (data types, formats, etc.)
+- Response parsing instructions
+- Study status and draft behavior explained
+
+SPECIFIC FIXES:
+
+1. Reward: Changed from "$7" to "700" (cents) with explanation
+2. URL: Added {{%PROLIFIC_PID%}} placeholder requirement
+3. Tool: Changed from generic description to specific MCP tool call
+4. Fields: Added all required and optional parameters
+5. Response: Added instructions to extract study_id
+6. Status: Clarified that studies are created as drafts (UNPUBLISHED)
+
